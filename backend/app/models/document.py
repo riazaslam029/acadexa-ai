@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 class Document(Base):
     __tablename__ = "documents"
 
+
     id: Mapped[int] = mapped_column(
         primary_key=True,
         index=True,
@@ -42,6 +43,20 @@ class Document(Base):
 
     file_type: Mapped[str] = mapped_column(
         String(100),
+        nullable=False,
+    )
+
+    extracted_text: Mapped[str | None] = mapped_column(
+        nullable=True,
+    )
+
+    summary: Mapped[str | None] = mapped_column(
+        nullable=True,
+    )
+
+    processing_status: Mapped[str] = mapped_column(
+        String(30),
+        default="uploaded",
         nullable=False,
     )
 
