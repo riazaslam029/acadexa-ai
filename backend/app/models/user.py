@@ -9,6 +9,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.ai_artifact import AIArtifact
+    from app.models.chat_history import ChatHistory
     from app.models.document import Document
     from app.models.note import Note
 
@@ -60,6 +62,16 @@ class User(Base):
     )
 
     documents: Mapped[list[Document]] = relationship(
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+
+    chat_messages: Mapped[list[ChatHistory]] = relationship(
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+
+    artifacts: Mapped[list[AIArtifact]] = relationship(
         back_populates="owner",
         cascade="all, delete-orphan",
     )

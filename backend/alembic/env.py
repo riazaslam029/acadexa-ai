@@ -9,6 +9,8 @@ from app.db.base import Base
 import app.models.user      # noqa: F401
 import app.models.note      # noqa: F401
 import app.models.document  # noqa: F401
+import app.models.chat_history  # noqa: F401
+import app.models.ai_artifact  # noqa: F401
 
 config = context.config
 
