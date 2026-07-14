@@ -31,3 +31,31 @@ Document:
     )
 
     return response.text
+
+def chat_with_document(
+    document_text: str,
+    question: str,
+) -> str:
+    prompt = f"""
+You are an AI study assistant.
+
+Answer ONLY using the information contained in the document below.
+
+If the answer is not present in the document, reply:
+"I couldn't find that information in the uploaded document."
+
+Document:
+
+{document_text}
+
+Question:
+
+{question}
+"""
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+    )
+
+    return response.text

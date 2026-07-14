@@ -16,6 +16,7 @@ from app.models.user import User
 from app.services.ai_service import generate_summary
 from app.services.file_service import save_upload_file
 from app.services.pdf_service import extract_text_from_pdf
+from app.services.ai_service import chat_with_document
 
 
 def process_uploaded_document(
@@ -107,4 +108,25 @@ def remove_user_document(
 
     return {
         "message": "Document deleted successfully.",
+    }
+
+def ask_document_question(
+    db: Session,
+    document_id: int,
+    question: str,
+    owner: User,
+) -> dict[str, str]:
+    document = get_user_document(
+        db,
+        document_id,
+        owner,
+    )
+
+    answer = chat_with_document(
+        document.extracted_text,
+        question,
+    )
+
+    return {
+        "answer": answer,
     }
