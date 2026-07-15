@@ -1,5 +1,5 @@
-import { type ReactNode, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
 import {
   Bell,
@@ -8,12 +8,14 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  Menu,
   Moon,
   Search,
   Settings,
   Sun,
   Upload,
   User,
+  X,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
@@ -29,8 +31,8 @@ import {
 } from "react-router-dom";
 
 import { useAuth } from "./state/AuthContext";
+import { DocumentProvider } from "./state/DocumentContext";
 import {
-  normalizeApiError,
   useArtifactsQuery,
   useChatHistoryQuery,
   useChatMutation,
@@ -40,14 +42,16 @@ import {
   useLoginMutation,
   useRegisterMutation,
   useUploadDocumentMutation,
+  normalizeApiError,
 } from "./state/hooks";
+import { ArtifactRenderer } from "./components/ArtifactRenderer";
 
-type NavItem = { label: string; path: string; icon: ReactNode };
+type NavItem = { label: string; path: string; icon: JSX.Element };
 
 const dashboardNav: NavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
   { label: "Upload", path: "/upload", icon: <Upload size={18} /> },
-  { label: "Document Details", path: "/documents/1", icon: <FileText size={18} /> },
+  { label: "Documents", path: "/documents", icon: <FileText size={18} /> },
   { label: "AI Chat", path: "/chat", icon: <Brain size={18} /> },
   { label: "Flashcards", path: "/flashcards", icon: <BookOpen size={18} /> },
   { label: "MCQs", path: "/mcqs", icon: <FileText size={18} /> },
@@ -69,8 +73,8 @@ function PublicLayout({ title, subtitle }: { title: string; subtitle: string }) 
             <Link className="btn-primary" to="/dashboard">
               Open Dashboard
             </Link>
-            <Link className="btn-ghost" to="/pricing">
-              Pricing
+            <Link className="btn-ghost" to="/login">
+              Login
             </Link>
           </div>
         </motion.div>
@@ -88,11 +92,12 @@ function PublicLayout({ title, subtitle }: { title: string; subtitle: string }) 
             <li>Roadmaps, study plans, and progress analytics</li>
           </ul>
           <nav className="mt-6 flex flex-wrap gap-2 text-sm">
-            <Link className="tag" to="/features">Features</Link>
-            <Link className="tag" to="/about">About</Link>
-            <Link className="tag" to="/contact">Contact</Link>
-            <Link className="tag" to="/login">Login</Link>
-            <Link className="tag" to="/register">Register</Link>
+            <Link className="tag" to="/login">
+              Login
+            </Link>
+            <Link className="tag" to="/register">
+              Register
+            </Link>
           </nav>
         </motion.div>
       </section>
@@ -111,7 +116,11 @@ function AuthPage({ title, mode }: { title: string; mode: "login" | "register" }
   const { login } = useAuth();
   const loginMutation = useLoginMutation();
   const registerMutation = useRegisterMutation();
-  const { register, handleSubmit } = useForm<AuthFormValues>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<AuthFormValues>({
     defaultValues: {
       name: "",
       email: "",
@@ -150,23 +159,46 @@ function AuthPage({ title, mode }: { title: string; mode: "login" | "register" }
         animate={{ opacity: 1, y: 0 }}
       >
         <h1 className="display text-3xl">{title}</h1>
-        <p className="mt-2 text-sm text-[var(--muted)]">Secure JWT authentication connected to FastAPI.</p>
+        {mode === "register" ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">Create your account to get started.</p>
+        ) : (
+          <p className="mt-2 text-sm text-[var(--muted)]">Welcome back! Sign in to continue.</p>
+        )}
         <form className="mt-6 grid gap-3" onSubmit={handleSubmit(onSubmit)}>
-          {mode === "register" ? (
-            <input className="input" placeholder="Full Name" aria-label="Full Name" {...register("name")} />
-          ) : null}
-          <input className="input" placeholder="Email" aria-label="Email" {...register("email")} />
+          {mode === "register" && (
+            <input
+              className="input"
+              placeholder="Full Name"
+              aria-label="Full Name"
+              {...register("name", { required: "Name is required" })}
+            />
+          )}
+          {errors.name && <span className="text-sm text-red-500">{errors.name.message}</span>}
+
           <input
             className="input"
-            placeholder="Password"
-            type="password"
-            aria-label="Password"
-            {...register("password")}
+            placeholder="Email"
+            aria-label="Email"
+            type="email"
+            {...register("email", { required: "Email is required" })}
           />
+          {errors.email && <span className="text-sm text-red-500">{errors.email.message}</span>}
+
+          <input
+            className="input"
+            placeholder="Password (min 8 characters)"
+            aria-label="Password"
+            type="password"
+            {...register("password", { required: "Password is required", minLength: { value: 8, message: "Password must be at least 8 characters" } })}
+          />
+          {errors.password && <span className="text-sm text-red-500">{errors.password.message}</span>}
+
           <button className="btn-primary" disabled={isLoading} type="submit">
-            {isLoading ? "Please wait..." : "Continue"}
+            {isLoading ? "Please wait..." : mode === "register" ? "Create Account" : "Sign In"}
           </button>
-          {errorText !== "Something went wrong." ? <p className="text-sm text-red-500">{errorText}</p> : null}
+          {errorText !== "Something went wrong." && (
+            <p className="text-sm text-red-500">{errorText}</p>
+          )}
           <Link className="btn-ghost text-center" to="/">
             Back Home
           </Link>
@@ -184,23 +216,47 @@ function ProtectedRoute() {
   return <Outlet />;
 }
 
-function DashboardLayout() {
-  const [isDark, setIsDark] = useState(false);
+function DashboardLayout({
+  isDark,
+  setIsDark,
+  children,
+}: {
+  isDark: boolean;
+  setIsDark: (v: boolean) => void;
+  children: React.ReactNode;
+}) {
   const location = useLocation();
   const { logout } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const title = useMemo(() => {
-    const found = dashboardNav.find((item) => location.pathname.startsWith(item.path));
-    return found?.label ?? "Dashboard";
-  }, [location.pathname]);
+  const title = dashboardNav.find((item) => location.pathname.startsWith(item.path))?.label ?? "Dashboard";
 
   return (
     <div className={isDark ? "theme-dark" : "theme-light"}>
       <div className="dashboard-wrap min-h-screen text-[var(--text)]">
-        <aside className="glass-panel m-3 hidden w-64 flex-col gap-2 p-4 md:flex">
+        <button
+          className="icon-btn fixed left-4 top-4 z-50 md:hidden"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle menu"
+        >
+          {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        <aside
+          className={`glass-panel fixed z-40 m-3 flex h-[calc(100vh-1.5rem)] w-64 flex-col gap-2 p-4 transition-transform md:static md:translate-x-0 ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
           <p className="caps mb-2">Acadexa AI</p>
           {dashboardNav.map((item) => (
-            <Link key={item.path} to={item.path} className="side-link">
+            <Link key={item.path} to={item.path} className="side-link" onClick={() => setSidebarOpen(false)}>
               {item.icon}
               <span>{item.label}</span>
             </Link>
@@ -221,7 +277,11 @@ function DashboardLayout() {
               <button className="icon-btn" aria-label="Notifications">
                 <Bell size={18} />
               </button>
-              <button className="icon-btn" aria-label="Toggle theme" onClick={() => setIsDark((v) => !v)}>
+              <button
+                className="icon-btn"
+                aria-label="Toggle theme"
+                onClick={() => setIsDark((v) => !v)}
+              >
                 {isDark ? <Sun size={18} /> : <Moon size={18} />}
               </button>
             </div>
@@ -234,7 +294,7 @@ function DashboardLayout() {
   );
 }
 
-function DashboardCard({ title, description }: { title: string; description: string }) {
+function DashboardCard({ title, description }: { title: string; description: string | number }) {
   return (
     <motion.article
       className="glass-panel p-5"
@@ -252,11 +312,26 @@ function DashboardHome() {
   const dashboardQuery = useDashboardQuery(isAuthenticated);
 
   if (dashboardQuery.isLoading) {
-    return <section className="glass-panel p-6">Loading dashboard...</section>;
+    return (
+      <section className="glass-panel p-6">
+        <div className="grid gap-3">
+          <div className="h-24 w-full animate-pulse rounded-lg bg-[var(--glass)]" />
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-20 w-full animate-pulse rounded-lg bg-[var(--glass)]" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
   }
 
   if (dashboardQuery.error) {
-    return <section className="glass-panel p-6">{normalizeApiError(dashboardQuery.error)}</section>;
+    return (
+      <section className="glass-panel p-6">
+        <p className="text-red-500">{normalizeApiError(dashboardQuery.error)}</p>
+      </section>
+    );
   }
 
   const data = dashboardQuery.data;
@@ -275,8 +350,9 @@ function DashboardHome() {
         <h3 className="text-xl font-semibold">Recent Uploads</h3>
         <ul className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
           {data.recent_uploads.map((item) => (
-            <li key={item.id}>
-              {item.original_name} - {item.processing_status}
+            <li key={item.id} className="flex justify-between">
+              <span>{item.original_name}</span>
+              <span className="text-xs">{item.processing_status}</span>
             </li>
           ))}
         </ul>
@@ -292,9 +368,7 @@ function UploadPage() {
 
   async function onSubmit(values: { file: FileList }) {
     const file = values.file?.[0];
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     setProgress(0);
     await uploadMutation.mutateAsync({ file, onProgress: setProgress });
@@ -303,7 +377,10 @@ function UploadPage() {
 
   return (
     <section className="glass-panel p-6">
-      <h2 className="display text-3xl">Upload</h2>
+      <h2 className="display text-3xl">Upload Document</h2>
+      <p className="mt-2 text-sm text-[var(--muted)]">
+        Supported formats: PDF, DOCX, TXT, PNG, JPEG, JPG
+      </p>
       <form className="mt-4 grid gap-3" onSubmit={handleSubmit(onSubmit)}>
         <input type="file" className="input" {...register("file")} />
         <div className="glass-panel h-3 overflow-hidden">
@@ -312,44 +389,75 @@ function UploadPage() {
         <button type="submit" className="btn-primary" disabled={uploadMutation.isPending}>
           {uploadMutation.isPending ? "Uploading..." : "Upload File"}
         </button>
-        {uploadMutation.error ? (
+        {uploadMutation.error && (
           <p className="text-sm text-red-500">{normalizeApiError(uploadMutation.error)}</p>
-        ) : null}
+        )}
       </form>
     </section>
   );
 }
 
 function ChatPage() {
-  const [documentId, setDocumentId] = useState(1);
+  const { isAuthenticated } = useAuth();
+  const documentsQuery = useDocumentsQuery(isAuthenticated);
+
+  const [documentId, setDocumentId] = useState<number | null>(null);
   const { register, handleSubmit, reset } = useForm<{ question: string }>();
-  const chatMutation = useChatMutation(documentId);
-  const historyQuery = useChatHistoryQuery(documentId, true);
+  const chatMutation = useChatMutation(documentId ?? 1);
+  const historyQuery = useChatHistoryQuery(documentId ?? 1, documentId !== null);
 
   async function onSubmit(values: { question: string }) {
+    if (!documentId) return;
     await chatMutation.mutateAsync(values.question);
     await historyQuery.refetch();
     reset();
   }
 
+  const selectedDoc = documentsQuery.data?.find((d) => d.id === documentId);
+
   return (
     <section className="glass-panel p-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="display text-3xl">AI Chat</h2>
-        <input
-          className="input w-36"
-          type="number"
-          value={documentId}
-          onChange={(event) => setDocumentId(Number(event.target.value) || 1)}
-          aria-label="Document ID"
-        />
+      <h2 className="display text-3xl">AI Chat</h2>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div>
+          <label className="text-sm text-[var(--muted)]">Select Document</label>
+          <select
+            className="input mt-1"
+            value={documentId ?? ""}
+            onChange={(e) => setDocumentId(Number(e.target.value))}
+          >
+            <option value="">Choose a document...</option>
+            {documentsQuery.data?.map((doc) => (
+              <option key={doc.id} value={doc.id}>
+                {doc.original_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="glass-panel p-3 text-sm text-[var(--muted)]">
+          <strong>Selected:</strong>{" "}
+          {selectedDoc ? `${selectedDoc.original_name} (${selectedDoc.processing_status})` : "None"}
+        </div>
       </div>
+
       <form className="mt-4 flex gap-3" onSubmit={handleSubmit(onSubmit)}>
-        <input className="input" placeholder="Ask from your document" {...register("question")} />
-        <button className="btn-primary" type="submit" disabled={chatMutation.isPending}>
+        <input
+          className="input flex-1"
+          placeholder="Ask from your document"
+          {...register("question")}
+          disabled={!documentId}
+        />
+        <button
+          className="btn-primary"
+          type="submit"
+          disabled={chatMutation.isPending || !documentId}
+        >
           {chatMutation.isPending ? "Thinking..." : "Send"}
         </button>
       </form>
+
       <div className="mt-5 grid gap-3">
         {historyQuery.data?.map((item) => (
           <div key={item.id} className="glass-panel p-4">
@@ -373,14 +481,23 @@ function ArtifactPage({
   title: string;
   artifactPath: string;
 }) {
-  const [documentId, setDocumentId] = useState(1);
-  const { register, handleSubmit } = useForm<{ count: number; difficulty: string; language: string }>({
+  const { isAuthenticated } = useAuth();
+  const documentsQuery = useDocumentsQuery(isAuthenticated);
+
+  const [documentId, setDocumentId] = useState<number | null>(null);
+  const { register, handleSubmit } = useForm<{
+    count: number;
+    difficulty: string;
+    language: string;
+  }>({
     defaultValues: { count: 10, difficulty: "medium", language: "english" },
   });
-  const listQuery = useArtifactsQuery(documentId, artifactPath, true);
-  const generateMutation = useGenerateArtifactMutation(documentId, artifactPath);
+
+  const listQuery = useArtifactsQuery(documentId ?? 0, artifactPath, documentId !== null);
+  const generateMutation = useGenerateArtifactMutation(documentId ?? 1, artifactPath);
 
   async function onGenerate(values: { count: number; difficulty: string; language: string }) {
+    if (!documentId) return;
     await generateMutation.mutateAsync(values);
     await listQuery.refetch();
   }
@@ -389,19 +506,26 @@ function ArtifactPage({
     <section className="glass-panel p-6">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="display text-3xl">{title}</h2>
-        <input
-          className="input w-36"
-          type="number"
-          value={documentId}
-          onChange={(event) => setDocumentId(Number(event.target.value) || 1)}
-          aria-label="Document ID"
-        />
+
+        <select
+          className="input w-auto"
+          value={documentId ?? ""}
+          onChange={(e) => setDocumentId(Number(e.target.value))}
+        >
+          <option value="">Select Document</option>
+          {documentsQuery.data?.map((doc) => (
+            <option key={doc.id} value={doc.id}>
+              {doc.original_name}
+            </option>
+          ))}
+        </select>
       </div>
+
       <form className="mt-4 grid gap-2 md:grid-cols-4" onSubmit={handleSubmit(onGenerate)}>
         <input className="input" type="number" {...register("count", { valueAsNumber: true })} />
         <input className="input" placeholder="difficulty" {...register("difficulty")} />
         <input className="input" placeholder="language" {...register("language")} />
-        <button className="btn-primary" type="submit" disabled={generateMutation.isPending}>
+        <button className="btn-primary" type="submit" disabled={generateMutation.isPending || !documentId}>
           Generate
         </button>
       </form>
@@ -409,7 +533,7 @@ function ArtifactPage({
       <ul className="mt-4 grid gap-2 text-sm">
         {listQuery.data?.map((item) => (
           <li key={item.id} className="glass-panel p-3">
-            <pre className="overflow-auto text-xs">{JSON.stringify(item.payload, null, 2)}</pre>
+            <ArtifactRenderer artifact={{ id: item.id, artifact_type: artifactPath, payload: item.payload, created_at: item.created_at }} />
           </li>
         ))}
       </ul>
@@ -423,14 +547,34 @@ function DocumentsPage() {
 
   return (
     <section className="glass-panel p-6">
-      <h2 className="display text-3xl">Document Details</h2>
-      <ul className="mt-4 grid gap-2 text-sm">
-        {query.data?.map((doc) => (
-          <li key={doc.id} className="glass-panel p-3">
-            {doc.original_name} - {doc.processing_status}
-          </li>
-        ))}
-      </ul>
+      <h2 className="display text-3xl">Your Documents</h2>
+
+      {query.isLoading ? (
+        <div className="mt-4 grid gap-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-12 w-full animate-pulse rounded-lg bg-[var(--glass)]" />
+          ))}
+        </div>
+      ) : query.error ? (
+        <p className="text-red-500">{normalizeApiError(query.error)}</p>
+      ) : (
+        <ul className="mt-4 grid gap-2 text-sm">
+          {query.data?.map((doc) => (
+            <li key={doc.id} className="glass-panel p-3 flex justify-between items-center">
+              <div>
+                <span className="font-semibold">{doc.original_name}</span>
+                <span className="text-xs text-[var(--muted)] ml-2">{doc.processing_status}</span>
+              </div>
+              <Link className="btn-ghost text-xs" to={`/documents/${doc.id}`}>
+                View
+              </Link>
+            </li>
+          ))}
+          {!query.data?.length && (
+            <p className="text-center py-8 text-[var(--muted)]">No documents uploaded yet.</p>
+          )}
+        </ul>
+      )}
     </section>
   );
 }
@@ -459,34 +603,38 @@ function NotFoundPage() {
 }
 
 export default function App() {
+  const [isDark, setIsDark] = useState(false);
+
   return (
-    <Routes>
-      <Route path="/" element={<PublicLayout title="AI Learning Assistant For Serious Students" subtitle="A modern SaaS workflow for document intelligence, adaptive assessments, and personalized planning." />} />
-      <Route path="/features" element={<PublicLayout title="Features" subtitle="Chat, flashcards, MCQs, notes, quizzes, translation, roadmap, and planner." />} />
-      <Route path="/pricing" element={<PublicLayout title="Pricing" subtitle="Simple academic pricing tiers with unlimited learning momentum." />} />
-      <Route path="/about" element={<PublicLayout title="About" subtitle="Built for portfolio-grade full stack and AI engineering excellence." />} />
-      <Route path="/contact" element={<PublicLayout title="Contact" subtitle="Reach out for collaboration, demos, and support." />} />
+    <DocumentProvider documents={[]}>
+      <Routes>
+        <Route path="/" element={<PublicLayout title="AI Learning Assistant For Serious Students" subtitle="A modern SaaS workflow for document intelligence, adaptive assessments, and personalized planning." />} />
+        <Route path="/features" element={<PublicLayout title="Features" subtitle="Chat, flashcards, MCQs, notes, quizzes, translation, roadmap, and planner." />} />
+        <Route path="/pricing" element={<PublicLayout title="Pricing" subtitle="Simple academic pricing tiers with unlimited learning momentum." />} />
+        <Route path="/about" element={<PublicLayout title="About" subtitle="Built for portfolio-grade full stack and AI engineering excellence." />} />
+        <Route path="/contact" element={<PublicLayout title="Contact" subtitle="Reach out for collaboration, demos, and support." />} />
 
-      <Route path="/login" element={<AuthPage title="Login" mode="login" />} />
-      <Route path="/register" element={<AuthPage title="Register" mode="register" />} />
-      <Route path="/forgot-password" element={<ContentPage title="Forgot Password" hint="Reset flow will be connected after backend reset-token APIs are added." />} />
+        <Route path="/login" element={<AuthPage title="Login" mode="login" />} />
+        <Route path="/register" element={<AuthPage title="Register" mode="register" />} />
+        <Route path="/forgot-password" element={<ContentPage title="Forgot Password" hint="Reset flow will be connected after backend reset-token APIs are added." />} />
 
-      <Route element={<ProtectedRoute />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<DashboardHome />} />
-          <Route path="/upload" element={<UploadPage />} />
-          <Route path="/documents/:id" element={<DocumentsPage />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/flashcards" element={<ArtifactPage title="Flashcards" artifactPath="flashcards" />} />
-          <Route path="/mcqs" element={<ArtifactPage title="MCQs" artifactPath="mcqs" />} />
-          <Route path="/quiz" element={<ArtifactPage title="Quiz" artifactPath="quiz" />} />
-          <Route path="/study-notes" element={<ArtifactPage title="Study Notes" artifactPath="notes" />} />
-          <Route path="/profile" element={<ContentPage title="Profile" hint="Update personal info and avatar." />} />
-          <Route path="/settings" element={<ContentPage title="Settings" hint="Theme, password, delete account, and API preferences." />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<DashboardLayout isDark={isDark} setIsDark={setIsDark} />}>
+            <Route path="/dashboard" element={<DashboardHome />} />
+            <Route path="/upload" element={<UploadPage />} />
+            <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/flashcards" element={<ArtifactPage title="Flashcards" artifactPath="flashcards" />} />
+            <Route path="/mcqs" element={<ArtifactPage title="MCQs" artifactPath="mcqs" />} />
+            <Route path="/quiz" element={<ArtifactPage title="Quiz" artifactPath="quiz" />} />
+            <Route path="/study-notes" element={<ArtifactPage title="Study Notes" artifactPath="notes" />} />
+            <Route path="/profile" element={<ContentPage title="Profile" hint="Update personal info and avatar." />} />
+            <Route path="/settings" element={<ContentPage title="Settings" hint="Theme, password, delete account, and API preferences." />} />
+          </Route>
         </Route>
-      </Route>
 
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </DocumentProvider>
   );
 }

@@ -6,7 +6,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    GEMINI_API_KEY: str
+    OPENROUTER_API_KEY: str
+    OPENROUTER_MODEL: str = "google/gemini-2.5-flash"
     APP_ENV: str = "development"
     APP_NAME: str = "Acadexa AI API"
 

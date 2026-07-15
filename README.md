@@ -10,7 +10,7 @@ A production-ready AI-powered learning assistant with document intelligence, ada
 - React Router
 - React Query
 - Framer Motion
-- Recharts
+- Recharts	
 - Axios
 
 ### Backend

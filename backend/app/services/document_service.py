@@ -18,19 +18,7 @@ from app.crud.document import (
 )
 from app.models.document import Document
 from app.models.user import User
-from app.services.ai_service import (
-    chat_with_document,
-    generate_eli5,
-    generate_flashcards,
-    generate_key_points,
-    generate_mcqs,
-    generate_quiz,
-    generate_roadmap,
-    generate_study_notes,
-    generate_study_plan,
-    generate_summary,
-    generate_translation,
-)
+from app.services.ai_service import ai_service, AIProviderError
 from app.services.file_service import (
     cleanup_temp_file,
     get_file_extension,
@@ -76,8 +64,14 @@ def process_uploaded_document(
             extracted_text,
         )
 
-        # Generate AI summary
-        summary = generate_summary(extracted_text)
+        # Generate AI summary (best-effort; upload still succeeds if model fails)
+        try:
+            summary = ai_service.generate_summary(extracted_text)
+        except AIProviderError:
+            summary = (
+                "Summary could not be generated automatically. "
+                "You can still chat with and generate study material from this document."
+            )
 
         # Save summary
         document = update_document_summary(
@@ -153,7 +147,7 @@ def ask_document_question(
         owner,
     )
 
-    answer = chat_with_document(
+    answer = ai_service.chat_with_document(
         document.extracted_text,
         question,
     )
@@ -199,28 +193,28 @@ def create_document_artifact(
         )
 
     if artifact_type == "flashcards":
-        payload = generate_flashcards(document_text, count=count)
+        payload = ai_service.generate_flashcards(document_text, count=count)
     elif artifact_type == "mcqs":
-        payload = generate_mcqs(document_text, count=count, difficulty=difficulty)
+        payload = ai_service.generate_mcqs(document_text, count=count, difficulty=difficulty)
     elif artifact_type == "key_points":
-        payload = generate_key_points(document_text)
+        payload = ai_service.generate_key_points(document_text)
     elif artifact_type == "study_notes":
-        payload = generate_study_notes(document_text)
+        payload = ai_service.generate_study_notes(document_text)
     elif artifact_type == "quizzes":
-        payload = generate_quiz(document_text, count=count, difficulty=difficulty)
+        payload = ai_service.generate_quiz(document_text, count=count, difficulty=difficulty)
     elif artifact_type == "translations":
         if not language:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="language is required for translation",
             )
-        payload = generate_translation(document_text, language=language)
+        payload = ai_service.generate_translation(document_text, language=language)
     elif artifact_type == "eli5":
-        payload = generate_eli5(document_text)
+        payload = ai_service.generate_eli5(document_text)
     elif artifact_type == "roadmap":
-        payload = generate_roadmap(document_text)
+        payload = ai_service.generate_roadmap(document_text)
     elif artifact_type == "study_plan":
-        payload = generate_study_plan(document_text)
+        payload = ai_service.generate_study_plan(document_text)
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

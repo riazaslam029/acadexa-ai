@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.db.session import get_db
-from app.dependencies.auth import get_current_user
+from app.auth.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.ai_artifact import AIArtifactResponse, ArtifactGenerateRequest, DeleteResponse
 from app.schemas.chat import ChatHistoryResponse, ChatRequest, ChatResponse
