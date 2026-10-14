@@ -7,7 +7,7 @@ This project supports multiple AI providers with automatic fallback.
 Get your free API key at: https://openrouter.ai/keys
 
 ```bash
-OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 OPENROUTER_MODEL=google/gemini-2.5-flash
 ```
 
@@ -21,7 +21,7 @@ OPENROUTER_MODEL=google/gemini-2.5-flash
 Edit `.env` file:
 ```bash
 # Primary provider
-OPENROUTER_API_KEY=your_key_here
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 OPENROUTER_MODEL=google/gemini-2.5-flash
 
 # Optional fallback
