@@ -54,9 +54,12 @@ def update_note(
     db_note: Note,
     note: NoteUpdate,
 ):
-    db_note.title = note.title
-    db_note.content = note.content
-    db_note.subject = note.subject
+    if note.title is not None:
+        db_note.title = note.title
+    if note.content is not None:
+        db_note.content = note.content
+    if note.subject is not None:
+        db_note.subject = note.subject
 
     db.commit()
     db.refresh(db_note)

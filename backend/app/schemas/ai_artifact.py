@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 ArtifactType = Literal[
@@ -22,26 +22,24 @@ LanguageCode = Literal["english", "urdu", "arabic", "french", "german"]
 
 
 class ArtifactGenerateRequest(BaseModel):
-    difficulty: DifficultyLevel | None = None
-    language: LanguageCode | None = None
-    count: int = Field(default=10, ge=1, le=50)
+    difficulty: DifficultyLevel | None = Field(default=None, description="Difficulty level (easy, medium, hard)")
+    language: LanguageCode | None = Field(default=None, description="Target language")
+    count: int = Field(default=10, ge=1, le=50, description="Number of items to generate (1 to 50)")
 
 
 class AIArtifactResponse(BaseModel):
     id: int
     artifact_type: ArtifactType
-    title: str | None
-    difficulty: str | None
-    language: str | None
+    title: str | None = None
+    difficulty: str | None = None
+    language: str | None = None
     payload: dict[str, Any]
     document_id: int
     owner_id: int
     created_at: datetime
     updated_at: datetime
 
-    model_config = {
-        "from_attributes": True,
-    }
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DeleteResponse(BaseModel):
